@@ -52,36 +52,46 @@ class UoocClient {
 
 			//小节
 			for (let section of chapter.children) {
-				//资源点
-				let resources;
-				await API.getUnitLearn(cid, chapter.id, section.id).then(ret => {
-					if (ret.code != 1) {
-						Fs.unlinkSync(saveFile);
-						throw new Error(ret.msg);
+				if (section.children) {
+					for (const childSection of section.children) {
+						await this.getChildClass(cid, chapter, childSection);
 					}
-					resources = ret.data;
-				});
-
-				for (let resource of resources) {
-					if (resource.type != VIDEO_MODE) continue;
-
-					//字幕
-					let subtitle, txt;
-					for (let key in resource.subtitle) {
-						let pass = true;
-						subtitle = resource.subtitle[key][0];
-						await srt2txt(subtitle.uri).then(ret => txt = ret).catch(() => pass = false);
-						if (pass) {
-							clogln('[' + key + '] ' + subtitle.title);
-							break;
-						}
-					}
-
-					Fs.writeFileSync(saveFile, subtitle.title + '\n\n' + txt + '\n\n', {
-						'flag': 'a'
-					});
+				} else {
+					await this.getChildClass(cid, chapter, section);
 				}
 			}
+		}
+	}
+
+	async getChildClass (cid, chapter, section) {
+		//资源点
+		let resources;
+		await API.getUnitLearn(cid, chapter.id, section.id).then(ret => {
+			if (ret.code != 1) {
+				Fs.unlinkSync(saveFile);
+				throw new Error(ret.msg);
+			}
+			resources = ret.data;
+		});
+
+		for (let resource of resources) {
+			if (resource.type != VIDEO_MODE) continue;
+
+			//字幕
+			let subtitle, txt;
+			for (let key in resource.subtitle) {
+				let pass = true;
+				subtitle = resource.subtitle[key][0];
+				await srt2txt(subtitle.uri).then(ret => txt = ret).catch(() => pass = false);
+				if (pass) {
+					clogln('[' + key + '] ' + subtitle.title);
+					break;
+				}
+			}
+
+			Fs.writeFileSync(saveFile, subtitle.title + '\n\n' + txt + '\n\n', {
+				'flag': 'a'
+			});
 		}
 	}
 
@@ -115,55 +125,64 @@ class UoocClient {
 					continue;
 				}
 				clogln();
+				if (section.children) {
+					for (const childSection of section.children) {
+						await this.learnClass(cid, chapter, childSection, speed);
+					}
+				} else {
+					await this.learnClass(cid, chapter, section, speed);
+				}
+			}
+		}
+	}
+	async learnClass(cid, chapter, section, speed) {
+		const API = this.API;
+		//资源点
+		let resources;
+		await API.getUnitLearn(cid, chapter.id, section.id).then(ret => {
+			if (ret.code != 1) throw new Error(ret.msg);
+			resources = ret.data;
+		});
 
-				//资源点
-				let resources;
-				await API.getUnitLearn(cid, chapter.id, section.id).then(ret => {
+		for (let resource of resources) {
+			clog('\t' + resource.title.replace(/^ +/, ''));
+			if (resource.finished || !resource.is_task || resource.type != VIDEO_MODE) {
+				clogln(" √");
+				continue;
+			}
+			clogln();
+
+			//资源信息
+			let video_length;
+			for (let key in resource.video_url) {
+				let pass = true;
+				let video_url = encodeURI(resource.video_url[key].source);
+				await getDuration(video_url).then(duration => video_length = duration.toFixed(2)).catch(() => pass = false);
+				if (pass) break;
+			}
+			let video_pos = parseFloat(resource.video_pos); //video_pos is a "number"
+			let vmax = parseFloat(video_length);
+
+			//模拟学习进度
+			let finished = false;
+			while (true) {
+				clogln('\t' + video_pos.toFixed(2) + '/' + video_length);
+
+				await API.markVideoLearn(cid, chapter.id, section.id, resource.id, video_length, video_pos.toFixed(2)).then(ret => {
 					if (ret.code != 1) throw new Error(ret.msg);
-					resources = ret.data;
+					finished = ret.data.finished;
 				});
 
-				for (let resource of resources) {
-					clog('\t' + resource.title.replace(/^ +/, ''));
-					if (resource.finished || !resource.is_task || resource.type != VIDEO_MODE) {
-						clogln(" √");
-						continue;
-					}
-					clogln();
+				if (finished) break;
+				video_pos += 60 * speed + Math.random();
 
-					//资源信息
-					let video_length;
-					for (let key in resource.video_url) {
-						let pass = true;
-						let video_url = encodeURI(resource.video_url[key].source);
-						await getDuration(video_url).then(duration => video_length = duration.toFixed(2)).catch(() => pass = false);
-						if (pass) break;
-					}
-					let video_pos = parseFloat(resource.video_pos); //video_pos is a "number"
-					let vmax = parseFloat(video_length);
-
-					//模拟学习进度
-					let finished = false;
-					while (true) {
-						clogln('\t' + video_pos.toFixed(2) + '/' + video_length);
-
-						await API.markVideoLearn(cid, chapter.id, section.id, resource.id, video_length, video_pos.toFixed(2)).then(ret => {
-							if (ret.code != 1) throw new Error(ret.msg);
-							finished = ret.data.finished;
-						});
-
-						if (finished) break;
-						video_pos += 60 * speed + Math.random();
-
-						let reduce = 0;
-						if (video_pos > vmax) {
-							reduce = (video_pos - vmax) / speed;
-							video_pos = vmax;
-						}
-
-						await sleep(65 - reduce);
-					}
+				let reduce = 0;
+				if (video_pos > vmax) {
+					reduce = (video_pos - vmax) / speed;
+					video_pos = vmax;
 				}
+
+				await sleep(65 - reduce);
 			}
 		}
 	}
