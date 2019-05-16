@@ -9,6 +9,7 @@ const getDuration = require('get-video-duration');
 const UoocAPI = require('./uoocapi');
 const srt2txt = require('./srt2txt');
 const Fs = require('fs');
+const answers = require('../answer.json').answers;
 
 const VIDEO_MODE = 10;
 
@@ -146,44 +147,100 @@ class UoocClient {
 
 		for (let resource of resources) {
 			clog('\t' + resource.title.replace(/^ +/, ''));
-			if (resource.finished || !resource.is_task || resource.type != VIDEO_MODE) {
+			if (resource.finished || !resource.is_task) {
 				clogln(" √");
 				continue;
 			}
 			clogln();
 
-			//资源信息
-			let video_length;
-			for (let key in resource.video_url) {
-				let pass = true;
-				let video_url = encodeURI(resource.video_url[key].source);
-				await getDuration(video_url).then(duration => video_length = duration.toFixed(2)).catch(() => pass = false);
-				if (pass) break;
+			if (resource.type == VIDEO_MODE) {
+				clog('\t' + '看视频');
+				await this.watchVideo(cid, chapter, section, resource, speed);
+			} else {
+				clog('\t' + '答题');
+				await this.doTest(cid, resource);
 			}
-			let video_pos = parseFloat(resource.video_pos); //video_pos is a "number"
-			let vmax = parseFloat(video_length);
+			
+		}
+	}
 
-			//模拟学习进度
-			let finished = false;
-			while (true) {
-				clogln('\t' + video_pos.toFixed(2) + '/' + video_length);
+	async doTest(cid, resource) {
+		const API = this.API;
 
-				await API.markVideoLearn(cid, chapter.id, section.id, resource.id, video_length, video_pos.toFixed(2)).then(ret => {
-					if (ret.code != 1) throw new Error(ret.msg);
-					finished = ret.data.finished;
-				});
-
-				if (finished) break;
-				video_pos += 60 * speed + Math.random();
-
-				let reduce = 0;
-				if (video_pos > vmax) {
-					reduce = (video_pos - vmax) / speed;
-					video_pos = vmax;
+		const questions = await API.getTaskPaper(resource.task_id).then(ret => {
+			if (ret.code != 1) throw new Error(ret.msg);
+			return ret.data.questions;
+		});
+		const unit = resource.title.replace(/^([1234567890\.]+).*$/, '$1');
+		let answer = answers.filter(answer => answer.unit === unit);
+		if (answer.length === 1) {
+			answer = answer[0].questions;
+		} else {
+			throw new Error('找不到对应的答案');
+		}
+		let data = [];
+		for (const question of questions) {
+			questionFor:
+			for (const a of answer) {
+				// 找到题目了
+				if (question.question.indexOf(a.question) !== -1) {
+					for (const option of question.options_app) {
+						if (option.value.indexOf(a.answer) !== -1) {
+							data.push({
+								qid: question.id,
+								answer: [option.key],
+								options: question.options_app.map(option => ({
+									checked: false,
+									key: option.key,
+									keyText: option.key,
+									text: option.value
+								}))
+							});
+							break questionFor;
+						}
+					}
 				}
-
-				await sleep(65 - reduce);
 			}
+		}
+		
+		await API.commitPaper(cid, resource.task_id, data, '用户提交').then(ret => {
+			if (ret.code != 1) throw new Error(ret.msg);
+		});
+	}
+
+	async watchVideo(cid, chapter, section, resource, speed) {
+		const API = this.API;
+		//资源信息
+		let video_length;
+		for (let key in resource.video_url) {
+			let pass = true;
+			let video_url = encodeURI(resource.video_url[key].source);
+			await getDuration(video_url).then(duration => video_length = duration.toFixed(2)).catch(() => pass = false);
+			if (pass) break;
+		}
+		let video_pos = parseFloat(resource.video_pos); //video_pos is a "number"
+		let vmax = parseFloat(video_length);
+
+		//模拟学习进度
+		let finished = false;
+		while (true) {
+			clogln('\t' + video_pos.toFixed(2) + '/' + video_length);
+
+			await API.markVideoLearn(cid, chapter.id, section.id, resource.id, video_length, video_pos.toFixed(2)).then(ret => {
+				if (ret.code != 1) throw new Error(ret.msg);
+				finished = ret.data.finished;
+			});
+
+			if (finished) break;
+			video_pos += 60 * speed + Math.random();
+
+			let reduce = 0;
+			if (video_pos > vmax) {
+				reduce = (video_pos - vmax) / speed;
+				video_pos = vmax;
+			}
+
+			await sleep(65 - reduce);
 		}
 	}
 }

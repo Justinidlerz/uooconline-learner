@@ -12,6 +12,8 @@ Axios.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded
 
 const BASE_URL = 'http://www.uooconline.com/home/learn/';
 
+const BASE_EXAM_URL = 'http://www.uooc.net.cn/exam/';
+
 
 class UoocAPI {
 	constructor(cookie) {
@@ -22,16 +24,16 @@ class UoocAPI {
 		};
 	}
 
-	callAPI(path, params) {
-		const url = BASE_URL + path;
+	callAPI(path, params, isExam) {
+		const url = (isExam ? BASE_EXAM_URL : BASE_URL) + path;
 		return Axios.get(url, {
 			headers: this.headers,
 			params
 		}).then(res => res.data);
 	}
 
-	callAPI_POST(path, data) {
-		const url = BASE_URL + path;
+	callAPI_POST(path, data, isExam) {
+		const url = (isExam ? BASE_EXAM_URL : BASE_URL) + path;
 		return Axios.post(url, Qs.stringify(data), {
 			headers: this.headers
 		}).then(res => res.data);
@@ -54,6 +56,21 @@ class UoocAPI {
 			hidemsg_: true,
 			show: ''
 		});
+	}
+
+	getTaskPaper(tid) {
+		return this.callAPI('getTaskPaper', {
+			tid
+		}, true);
+	}
+
+	commitPaper(cid, tid, data, resaon) {
+		return this.callAPI_POST('commit', {
+			cid,
+			tid, 
+			data,
+			resaon,
+		}, true);
 	}
 
 	markVideoLearn(cid, chapter_id, section_id, resource_id, video_length, video_pos) {
