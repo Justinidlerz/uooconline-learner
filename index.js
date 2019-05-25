@@ -25,6 +25,6 @@ if (args[0] && args[0] == "subtitle") {
   } else {
     (async () => {
       const ids = await uooc.getCourseIds();
-      ids.forEach(cid => process.nextTick(() => learnWithRetry()));
+      ids.forEach(cid => process.nextTick(() => uooc.learn(cid, speed)));
     })()
   } 
