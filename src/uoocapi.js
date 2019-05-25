@@ -24,6 +24,12 @@ class UoocAPI {
 		};
 	}
 
+	getCourseList(page = 1) {
+		return Axios.get(`http://www.uooc.net.cn/home/course/list?&page=${page}&type=learn`, {
+			headers: this.headers,
+		}).then(res => res.data);
+	}
+
 	callAPI(path, params, isExam) {
 		const url = (isExam ? BASE_EXAM_URL : BASE_URL) + path;
 		return Axios.get(url, {
@@ -68,7 +74,7 @@ class UoocAPI {
 		return this.callAPI_POST('commit', {
 			cid,
 			tid, 
-			data,
+			data: JSON.stringify(data),
 			resaon,
 		}, true);
 	}

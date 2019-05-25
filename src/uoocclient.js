@@ -9,7 +9,7 @@ const getDuration = require('get-video-duration');
 const UoocAPI = require('./uoocapi');
 const srt2txt = require('./srt2txt');
 const Fs = require('fs');
-const answers = require('../answer.json').answers;
+const path = require('path');
 
 const VIDEO_MODE = 10;
 
@@ -28,6 +28,22 @@ function sleep(s) {
 class UoocClient {
 	constructor(cookie) {
 		this.API = new UoocAPI(cookie);
+	}
+
+	async getCourseIds() {
+		const API = this.API;
+		const courseIds = [];
+		const ret = await API.getCourseList();
+		if (ret.code !== 1) throw new Error(ret.msg);
+		ret.data.data.forEach(item => courseIds.push(item.id))
+		if (ret.data.pages > 1) {
+			for (let i = 2; i <= ret.data.pages; i++) {
+				const nextData = await API.getCourseList(i);
+				if (nextData.code !== 1) throw new Error(nextData.msg);
+				nextData.data.data.forEach(item => courseIds.push(item.id))
+			}
+		}
+		return courseIds;
 	}
 
 	async downloadSubtitles(cid) {
@@ -65,6 +81,7 @@ class UoocClient {
 	}
 
 	async getChildClass (cid, chapter, section) {
+		const API = this.API;
 		//资源点
 		let resources;
 		await API.getUnitLearn(cid, chapter.id, section.id).then(ret => {
@@ -98,6 +115,10 @@ class UoocClient {
 
 	async learn(cid, speed) {
 		const API = this.API;
+		const answersFilePath = path.join(__dirname, `../answers/${cid}.json`);
+		if (Fs.existsSync(answersFilePath)) {
+			this.answers = require(`../answers/${cid}.json`).answers;
+		}
 
 		let list;
 		speed *= 0.97;
@@ -164,28 +185,38 @@ class UoocClient {
 		}
 	}
 
+
 	async doTest(cid, resource) {
 		const API = this.API;
+
+		if (!this.answers) {
+			throw new Error('你还没有准备答案列表！');
+		}
 
 		const questions = await API.getTaskPaper(resource.task_id).then(ret => {
 			if (ret.code != 1) throw new Error(ret.msg);
 			return ret.data.questions;
 		});
 		const unit = resource.title.replace(/^([1234567890\.]+).*$/, '$1');
-		let answer = answers.filter(answer => answer.unit === unit);
+		let answer = this.answers.filter(answer => answer.unit === unit);
 		if (answer.length === 1) {
 			answer = answer[0].questions;
 		} else {
 			throw new Error('找不到对应的答案');
 		}
+		// return
 		let data = [];
 		for (const question of questions) {
+			let foundQuestion = false;
+			let foundAnswer = false;
 			questionFor:
 			for (const a of answer) {
 				// 找到题目了
 				if (question.question.indexOf(a.question) !== -1) {
+					foundQuestion = true;
 					for (const option of question.options_app) {
 						if (option.value.indexOf(a.answer) !== -1) {
+							foundAnswer = true;
 							data.push({
 								qid: question.id,
 								answer: [option.key],
@@ -201,8 +232,11 @@ class UoocClient {
 					}
 				}
 			}
+			if (!foundQuestion || !foundAnswer) {
+				throw new Error('找不到对应的题目或答案, 题目为：' + question.question);
+			}
 		}
-		
+
 		await API.commitPaper(cid, resource.task_id, data, '用户提交').then(ret => {
 			if (ret.code != 1) throw new Error(ret.msg);
 		});
