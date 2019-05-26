@@ -30,22 +30,6 @@ class UoocClient {
 		this.API = new UoocAPI(cookie);
 	}
 
-	async getCourseIds() {
-		const API = this.API;
-		const courseIds = [];
-		const ret = await API.getCourseList();
-		if (ret.code !== 1) throw new Error(ret.msg);
-		ret.data.data.forEach(item => courseIds.push(item.id))
-		if (ret.data.pages > 1) {
-			for (let i = 2; i <= ret.data.pages; i++) {
-				const nextData = await API.getCourseList(i);
-				if (nextData.code !== 1) throw new Error(nextData.msg);
-				nextData.data.data.forEach(item => courseIds.push(item.id))
-			}
-		}
-		return courseIds;
-	}
-
 	async downloadSubtitles(cid) {
 		const API = this.API;
 
