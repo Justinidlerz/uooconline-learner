@@ -9,12 +9,13 @@ const fs = require('fs');
 const notifier = require('node-notifier');
 var nc = new notifier.NotificationCenter();
 const UoocAPI = require('./src/uoocapi');
+const Uooc = require('./src/uoocclient');
 
 //cookie
 const cookie = fs.readFileSync('./cookie', 'utf-8');
 
 const read = (cid) => {
-  const uooc = new(require('./src/uoocclient'))(cookie);
+  const uooc = new(Uooc)(cookie);
   uooc.learn(cid).catch(e => {
     const answersFilePath = path.join(__dirname, `./answers/${cid}.json`);
     let className = '';
@@ -53,5 +54,7 @@ const getCourseIds = async() => {
 
 (async () => {
   const ids = await getCourseIds();
-  ids.forEach(cid => process.nextTick(() => read(cid)));
+  ids.forEach((cid, index) => {
+    process.nextTick(() => setTimeout(() => read(cid), index * 500));
+  });
 })()
