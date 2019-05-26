@@ -12,6 +12,9 @@ const Fs = require('fs');
 const path = require('path');
 
 const VIDEO_MODE = 10;
+const TEXT_MODE = 60;
+const TEST_MODE = 80;
+
 
 function clog(str) {
 	process.stdout.write(str);
@@ -150,19 +153,19 @@ class UoocClient {
 			if (ret.code != 1) throw new Error(ret.msg);
 			resources = ret.data;
 		});
-
 		for (let resource of resources) {
-			clog('\t' + resource.title.replace(/^ +/, ''));
+			clog('\t' + (resource.title && resource.title.replace(/^ +/, '')));
 			if (resource.finished || !resource.is_task) {
 				clogln(" √");
 				continue;
 			}
 			clogln();
-
 			if (resource.type == VIDEO_MODE) {
 				clog('\t' + '看视频');
 				await this.watchVideo(cid, chapter, section, resource, speed);
-			} else {
+			} else if (resource.type == TEXT_MODE) {
+				console.log('文本');
+			} else if (resource.type == TEST_MODE) {
 				clog('\t' + '答题');
 				await this.doTest(cid, resource);
 			}

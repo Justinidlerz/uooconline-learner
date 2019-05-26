@@ -16,6 +16,7 @@ const cookie = fs.readFileSync('./cookie', 'utf-8');
 const read = (cid) => {
   const uooc = new(Uooc)(cookie);
   uooc.learn(cid, speed).catch(e => {
+    console.log(e);
     const answersFilePath = path.join(__dirname, `./answers/${cid}.json`);
     let className = '';
     if (fs.existsSync(answersFilePath)) {
