@@ -117,7 +117,8 @@ class UoocClient {
 		const API = this.API;
 		const answersFilePath = path.join(__dirname, `../answers/${cid}.json`);
 		if (Fs.existsSync(answersFilePath)) {
-			this.answers = require(`../answers/${cid}.json`).answers;
+			delete require.cache[require.resolve(answersFilePath)]
+			this.answers = require(answersFilePath).answers;
 		}
 
 		let list;
