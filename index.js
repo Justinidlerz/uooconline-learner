@@ -55,4 +55,5 @@ const getCourseIds = async() => {
 (async () => {
   const ids = await getCourseIds();
   ids.forEach((cid) => process.nextTick(() => read(cid)));
+  // read('210001848')
 })()

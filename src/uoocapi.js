@@ -1,6 +1,6 @@
 /*
- * @Author: Jindai Kirin 
- * @Date: 2018-11-02 16:51:03 
+ * @Author: Jindai Kirin
+ * @Date: 2018-11-02 16:51:03
  * @Last Modified by: Jindai Kirin
  * @Last Modified time: 2018-11-03 11:01:17
  */
@@ -22,6 +22,19 @@ class UoocAPI {
 			'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36',
 			'Cookie': cookie
 		};
+	}
+
+	getTests(cid) {
+		return Axios.get(`http://www.uooc.net.cn/home/task/testList?cid=${cid}&page=1&pagesize=60`, {
+			headers: this.headers
+		}).then(res => res.data);
+	}
+
+	getTestDetail(cid, tid) {
+		return Axios.get(`http://www.uooc.net.cn/exam/view?cid=${cid}&tid=${tid}`, {
+			headers: this.headers
+		}).then(res => res.data);
+
 	}
 
 	getCourseList(page = 1) {
@@ -73,7 +86,7 @@ class UoocAPI {
 	commitPaper(cid, tid, data, resaon) {
 		return this.callAPI_POST('commit', {
 			cid,
-			tid, 
+			tid,
 			data: JSON.stringify(data),
 			resaon,
 		}, true);

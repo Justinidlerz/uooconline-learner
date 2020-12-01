@@ -1,0 +1,33 @@
+# <%= name %>
+---
+
+<% function contentRenderer (q, i) {%>
+<%= i + 1 %>. <%= q.title %><%= "   " %>
+<% Object.entries(q.answers[0]).forEach(([k, v]) => { %>
+    <font color=red >${k}: ${String(v).replace(/<([^>]+)>/g, '')}</font>
+<% }) %>
+    <p>&nbsp;</p>
+<% } %>
+
+<% for (const test of tests) { %>
+## <%= test.name %>
+
+    <% if (test.singleOption.length) { %>
+### 单选题
+
+    <% test.singleOption.forEach(contentRenderer) %>
+<% } %>
+
+<% if (test.multipleOptions.length) { %>
+### 多选题
+
+    <% test.multipleOptions.forEach(contentRenderer) %>
+<% } %>
+
+<% if (test.trueFalse.length) { %>
+### 判断题
+
+    <% test.trueFalse.forEach(contentRenderer) %>
+<% } %>
+
+<% } %>

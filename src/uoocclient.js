@@ -1,20 +1,27 @@
 /*
- * @Author: Jindai Kirin 
- * @Date: 2018-11-02 20:55:42 
+ * @Author: Jindai Kirin
+ * @Date: 2018-11-02 20:55:42
  * @Last Modified by: Jindai Kirin
  * @Last Modified time: 2018-11-11 18:04:30
  */
 
 const getDuration = require('get-video-duration');
+const _ = require('lodash');
 const UoocAPI = require('./uoocapi');
 const srt2txt = require('./srt2txt');
 const Fs = require('fs');
 const path = require('path');
 
-const VIDEO_MODE = 10;
+const VIDEO_MODE = ['10', '20', 10, 20];
 const TEXT_MODE = 60;
 const TEST_MODE = 80;
 
+
+const QUESTION_TYPE_MAP = {
+	10: 'singleOption',
+	11: 'multipleOptions',
+	20: 'trueFalse'
+}
 
 function clog(str) {
 	process.stdout.write(str);
@@ -31,6 +38,41 @@ function sleep(s) {
 class UoocClient {
 	constructor(cookie) {
 		this.API = new UoocAPI(cookie);
+	}
+
+	async getTests(cid) {
+		const API = this.API;
+
+		const { code, msg, data } = await API.getTests(cid);
+		if (code !== 1) {
+			throw new Error(msg);
+		}
+		const formattedTests = [];
+		for (const test of data.data) {
+			if (test.status_code == '0') continue;
+			try {
+				const {code, msg, data: { questions, task } } = await API.getTestDetail(cid, test.id);
+				if (code !== 1) {
+					throw new Error(msg);
+				}
+				const question = {
+					name: task.name,
+					singleOption: [],
+					multipleOptions: [],
+					trueFalse: [],
+				}
+				for (const q of questions) {
+					question[QUESTION_TYPE_MAP[q.type]].push({
+						title: q.question,
+						answers: [_.pick(q.options, q.answer)],
+					});
+				}
+				formattedTests.push(question);
+			} catch (e) {
+				console.log(e, test);
+			}
+		}
+		return formattedTests;
 	}
 
 	async downloadSubtitles(cid) {
@@ -80,7 +122,7 @@ class UoocClient {
 		});
 
 		for (let resource of resources) {
-			if (resource.type != VIDEO_MODE) continue;
+			if (!VIDEO_MODE.includes(resource.type)) continue;
 
 			//字幕
 			let subtitle, txt;
@@ -121,7 +163,7 @@ class UoocClient {
 		//章节
 		for (let chapter of list) {
 			clog('\n' + chapter.name.replace(/^ +/, ''));
-			if (chapter.finished || chapter.learn_mode != VIDEO_MODE) {
+			if (chapter.finished || !VIDEO_MODE.includes(chapter.learn_mode)) {
 				clogln(" √");
 				continue;
 			}
@@ -130,7 +172,7 @@ class UoocClient {
 			//小节
 			for (let section of chapter.children) {
 				clog(section.number + ' ' + section.name.replace(/^ +/, ''));
-				if (section.finished || section.learn_mode != VIDEO_MODE) {
+				if (section.finished || !VIDEO_MODE.includes(chapter.learn_mode)) {
 					clogln(" √");
 					continue;
 				}
@@ -160,16 +202,16 @@ class UoocClient {
 				continue;
 			}
 			clogln();
-			if (resource.type == VIDEO_MODE) {
+			if (VIDEO_MODE.includes(chapter.learn_mode)) {
 				clog('\t' + '看视频');
 				await this.watchVideo(cid, chapter, section, resource, speed);
 			} else if (resource.type == TEXT_MODE) {
-				console.log('文本');
+				clog('\t' + '文本');
 			} else if (resource.type == TEST_MODE) {
 				clog('\t' + '答题');
 				await this.doTest(cid, resource);
 			}
-			
+
 		}
 	}
 

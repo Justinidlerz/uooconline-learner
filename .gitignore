@@ -65,3 +65,5 @@ typings/
 
 
 cookie
+.idea
+.DS_Store
